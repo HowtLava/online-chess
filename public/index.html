@@ -1,90 +1,305 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Play Chess with Friends</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css" />
+  <meta charset="UTF-8">
+  <title>Online Multiplayer Chess</title>
+  <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
   <style>
-    body { font-family: Arial, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #2f3542; color: white; }
-    #board { width: 400px; margin: 20px 0; }
-    .controls { display: flex; gap: 10px; margin-bottom: 10px; }
-    input, button { padding: 8px 12px; font-size: 14px; border-radius: 4px; border: none; }
-    button { background: #2ed573; color: white; cursor: pointer; font-weight: bold; }
+    :root {
+      --bg-color: #161512;
+      --panel-bg: #262421;
+      --text-color: #bababa;
+      --accent-color: #81b64c;
+      --accent-hover: #a3d168;
+      --border-color: #403d39;
+    }
+
+    body {
+      margin: 0;
+      padding: 20px;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      box-sizing: border-box;
+    }
+
+    .app-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+      background-color: var(--panel-bg);
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+      max-width: 900px;
+      width: 100%;
+    }
+
+    .board-container {
+      flex: 1 1 400px;
+      max-width: 480px;
+    }
+
+    #board {
+      width: 100% !important;
+      border-radius: 6px;
+      overflow: hidden;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    }
+
+    .sidebar {
+      flex: 1 1 300px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .panel-box {
+      background: #1e1d1b;
+      padding: 16px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+    }
+
+    h3 {
+      color: #fff;
+      margin: 0 0 12px 0;
+    }
+
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    input {
+      padding: 10px 14px;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+      background: #161512;
+      color: #fff;
+      font-size: 14px;
+    }
+
+    button {
+      padding: 10px 16px;
+      border-radius: 6px;
+      border: none;
+      background: var(--accent-color);
+      color: #fff;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background: var(--accent-hover);
+    }
+
+    .friend-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      background: #262421;
+      border-radius: 6px;
+      margin-bottom: 8px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 8px;
+      background-color: #81b64c;
+    }
+
+    #status {
+      font-weight: bold;
+      color: #fff;
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
 
-  <h1>Play Chess Online</h1>
-  <div class="controls">
-    <button id="createBtn">Create Room</button>
-    <input type="text" id="roomInput" placeholder="Enter Room Code" />
-    <button id="joinBtn">Join Room</button>
+<div class="app-container">
+  <div class="board-container">
+    <div id="board"></div>
   </div>
-  <p id="status">Create or join a room to start.</p>
 
-  <div id="board"></div>
+  <div class="sidebar">
+    <!-- Account Login/Register Panel -->
+    <div class="panel-box" id="auth-panel">
+      <h3>Account Login</h3>
+      <div class="input-group">
+        <input type="text" id="auth-username" placeholder="Username">
+        <input type="password" id="auth-password" placeholder="Password">
+        <div style="display: flex; gap: 8px;">
+          <button id="login-btn" style="flex: 1;">Log In</button>
+          <button id="register-btn" style="flex: 1; background: #403d39;">Register</button>
+        </div>
+      </div>
+      <div id="auth-msg" style="font-size: 13px; color: #ff6b6b;"></div>
+    </div>
 
-  <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
-  <script src="/socket.io/socket.io.js"></script>
+    <!-- Game Lobby -->
+    <div class="panel-box">
+      <h3>Game Lobby</h3>
+      <button id="create-btn" style="width: 100%; margin-bottom: 12px;">Create Room</button>
+      <div class="input-group" style="flex-direction: row;">
+        <input type="text" id="room-input" placeholder="Room Code" style="flex: 1;">
+        <button id="join-btn">Join Room</button>
+      </div>
+      <div id="status">Please log in to play.</div>
+    </div>
 
-  <script>
-    const socket = io();
-    const game = new Chess();
-    let playerColor = 'white';
-    let currentRoom = null;
+    <!-- Online Players -->
+    <div class="panel-box">
+      <h3>Online Players</h3>
+      <div id="friends-list">
+        <div style="font-size: 13px; color: #777;">Log in to see online players.</div>
+      </div>
+    </div>
+  </div>
+</div>
 
-    const board = Chessboard('board', {
-      draggable: true,
-      position: 'start',
-      pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png',
-      onDragStart: (source, piece) => {
-        if (game.game_over()) return false;
-        if ((playerColor === 'white' && piece.search(/^b/) !== -1) ||
-            (playerColor === 'black' && piece.search(/^w/) !== -1)) {
-          return false;
-        }
-      },
-      onDrop: (source, target) => {
-        const move = game.move({ from: source, to: target, promotion: 'q' });
-        if (move === null) return 'snapback';
-        socket.emit('makeMove', { roomId: currentRoom, move });
-      }
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+
+<script>
+  const socket = io();
+  let board = null;
+  let game = new Chess();
+  let roomCode = null;
+  let playerColor = 'w';
+
+  // Fix Piece Images with Explicit Image CDN URL
+  board = Chessboard('board', {
+    draggable: true,
+    position: 'start',
+    pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png',
+    onDragStart: onDragStart,
+    onDrop: onDrop,
+    onSnapEnd: onSnapEnd
+  });
+
+  function onDragStart(source, piece) {
+    if (game.game_over()) return false;
+    if ((playerColor === 'w' && piece.search(/^b/) !== -1) ||
+        (playerColor === 'b' && piece.search(/^w/) !== -1)) {
+      return false;
+    }
+  }
+
+  function onDrop(source, target) {
+    const move = game.move({ from: source, to: target, promotion: 'q' });
+    if (move === null) return 'snapback';
+    socket.emit('make-move', { roomCode: roomCode, move: move });
+    updateStatus();
+  }
+
+  function onSnapEnd() {
+    board.position(game.fen());
+  }
+
+  function updateStatus() {
+    let statusText = '';
+    if (game.in_checkmate()) {
+      statusText = 'Game over, checkmate!';
+    } else if (game.in_draw()) {
+      statusText = 'Game over, draw!';
+    } else {
+      statusText = (game.turn() === 'w' ? "White's turn" : "Black's turn");
+      if (game.in_check()) statusText += ', check!';
+    }
+    $('#status').text(statusText);
+  }
+
+  // Account Auth Logic
+  $('#register-btn').on('click', () => {
+    const username = $('#auth-username').val().trim();
+    const password = $('#auth-password').val().trim();
+    socket.emit('register', { username, password });
+  });
+
+  $('#login-btn').on('click', () => {
+    const username = $('#auth-username').val().trim();
+    const password = $('#auth-password').val().trim();
+    socket.emit('login', { username, password });
+  });
+
+  socket.on('auth-error', (msg) => {
+    $('#auth-msg').css('color', '#ff6b6b').text(msg);
+  });
+
+  socket.on('auth-success', (data) => {
+    $('#auth-msg').css('color', '#81b64c').text(data.message);
+  });
+
+  socket.on('login-success', (data) => {
+    $('#auth-panel').hide();
+    $('#status').text(`Logged in as ${data.username}. Ready to play!`);
+  });
+
+  socket.on('online-users-update', (users) => {
+    const $list = $('#friends-list');
+    $list.empty();
+    if (users.length === 0) {
+      $list.append('<div style="font-size: 13px; color: #777;">No other players online.</div>');
+      return;
+    }
+    users.forEach(user => {
+      $list.append(`
+        <div class="friend-item">
+          <span><span class="status-dot"></span>${user}</span>
+          <span style="font-size: 12px; color: #81b64c;">Online</span>
+        </div>
+      `);
     });
+  });
 
-    $('#createBtn').on('click', () => {
-      socket.emit('createGame');
-    });
-    
-    $('#joinBtn').on('click', () => {
-      const room = $('#roomInput').val().trim();
-      if (room) socket.emit('joinGame', room);
-    });
+  // Room Controls
+  $('#create-btn').on('click', () => socket.emit('create-room'));
+  $('#join-btn').on('click', () => {
+    const code = $('#room-input').val().trim();
+    if (code) socket.emit('join-room', code);
+  });
 
-    socket.on('gameCreated', ({ roomId, color }) => {
-      currentRoom = roomId;
-      playerColor = color;
-      $('#status').text(`Room Code: ${roomId}. Waiting for your friend...`);
-    });
+  socket.on('room-created', (code) => {
+    roomCode = code;
+    playerColor = 'w';
+    $('#status').text(`Room Created: ${code}. Waiting for opponent...`);
+  });
 
-    socket.on('gameJoined', ({ roomId, color }) => {
-      currentRoom = roomId;
-      playerColor = color;
-      board.orientation(color);
-      $('#status').text(`Joined Room: ${roomId}. Game started!`);
-    });
+  socket.on('player-joined', (data) => {
+    roomCode = data.roomCode;
+    if (!playerColor || playerColor === 'w') playerColor = 'w';
+    $('#status').text(`Game started! Playing as White.`);
+  });
 
-    socket.on('playerJoined', () => {
-      $('#status').text('Friend joined! Your turn.');
-    });
+  socket.on('joined-room', (code) => {
+    roomCode = code;
+    playerColor = 'b';
+    board.orientation('black');
+    $('#status').text(`Joined Room ${code}. Playing as Black.`);
+  });
 
-    socket.on('moveMade', (move) => {
-      game.move(move);
-      board.position(game.fen());
-    });
+  socket.on('move-made', (move) => {
+    game.move(move);
+    board.position(game.fen());
+    updateStatus();
+  });
 
-    socket.on('error', (msg) => alert(msg));
-  </script>
+  socket.on('error-message', (msg) => alert(msg));
+</script>
 </body>
 </html>
