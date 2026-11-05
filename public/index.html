@@ -55,7 +55,7 @@
       flex: 1 1 300px;
       display: flex;
       flex-direction: column;
-      gap: 20px;
+      gap: 16px;
     }
 
     .panel-box {
@@ -67,18 +67,18 @@
 
     h3 {
       color: #fff;
-      margin: 0 0 12px 0;
+      margin: 0 0 10px 0;
     }
 
     .input-group {
       display: flex;
-      flex-direction: column;
       gap: 8px;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
     }
 
     input {
-      padding: 10px 14px;
+      flex: 1;
+      padding: 8px 12px;
       border-radius: 6px;
       border: 1px solid var(--border-color);
       background: #161512;
@@ -87,7 +87,7 @@
     }
 
     button {
-      padding: 10px 16px;
+      padding: 8px 14px;
       border-radius: 6px;
       border: none;
       background: var(--accent-color);
@@ -108,7 +108,7 @@
       padding: 8px 12px;
       background: #262421;
       border-radius: 6px;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
 
     .status-dot {
@@ -123,7 +123,8 @@
     #status {
       font-weight: bold;
       color: #fff;
-      margin-top: 10px;
+      margin-top: 8px;
+      font-size: 14px;
     }
   </style>
 </head>
@@ -135,13 +136,13 @@
   </div>
 
   <div class="sidebar">
-    <!-- Account Login/Register Panel -->
+    <!-- Account Login Panel -->
     <div class="panel-box" id="auth-panel">
       <h3>Account Login</h3>
-      <div class="input-group">
+      <div class="input-group" style="flex-direction: column;">
         <input type="text" id="auth-username" placeholder="Username">
         <input type="password" id="auth-password" placeholder="Password">
-        <div style="display: flex; gap: 8px;">
+        <div style="display: flex; gap: 8px; margin-top: 4px;">
           <button id="login-btn" style="flex: 1;">Log In</button>
           <button id="register-btn" style="flex: 1; background: #403d39;">Register</button>
         </div>
@@ -152,19 +153,29 @@
     <!-- Game Lobby -->
     <div class="panel-box">
       <h3>Game Lobby</h3>
-      <button id="create-btn" style="width: 100%; margin-bottom: 12px;">Create Room</button>
-      <div class="input-group" style="flex-direction: row;">
-        <input type="text" id="room-input" placeholder="Room Code" style="flex: 1;">
-        <button id="join-btn">Join Room</button>
+      <button id="create-btn" style="width: 100%; margin-bottom: 10px;">Create Room</button>
+      <div class="input-group">
+        <input type="text" id="room-input" placeholder="Room Code">
+        <button id="join-btn">Join</button>
       </div>
       <div id="status">Please log in to play.</div>
     </div>
 
-    <!-- Online Players -->
+    <!-- Online Players / Challenge List -->
     <div class="panel-box">
       <h3>Online Players</h3>
       <div id="friends-list">
         <div style="font-size: 13px; color: #777;">Log in to see online players.</div>
+      </div>
+    </div>
+
+    <!-- Private In-Game Chat Box -->
+    <div class="panel-box" id="chat-panel" style="display: none;">
+      <h3>Game Chat</h3>
+      <div id="chat-messages" style="height: 90px; overflow-y: auto; background: #161512; padding: 8px; border-radius: 4px; font-size: 13px; margin-bottom: 8px;"></div>
+      <div class="input-group" style="margin-bottom: 0;">
+        <input type="text" id="chat-input" placeholder="Type a message...">
+        <button id="send-chat-btn">Send</button>
       </div>
     </div>
   </div>
@@ -181,8 +192,8 @@
   let game = new Chess();
   let roomCode = null;
   let playerColor = 'w';
+  let loggedInUser = null;
 
-  // Fix Piece Images with Explicit Image CDN URL
   board = Chessboard('board', {
     draggable: true,
     position: 'start',
@@ -224,47 +235,68 @@
     $('#status').text(statusText);
   }
 
-  // Account Auth Logic
+  // Auth Handling
   $('#register-btn').on('click', () => {
-    const username = $('#auth-username').val().trim();
-    const password = $('#auth-password').val().trim();
-    socket.emit('register', { username, password });
+    socket.emit('register', { username: $('#auth-username').val().trim(), password: $('#auth-password').val().trim() });
   });
 
   $('#login-btn').on('click', () => {
-    const username = $('#auth-username').val().trim();
-    const password = $('#auth-password').val().trim();
-    socket.emit('login', { username, password });
+    socket.emit('login', { username: $('#auth-username').val().trim(), password: $('#auth-password').val().trim() });
   });
 
-  socket.on('auth-error', (msg) => {
-    $('#auth-msg').css('color', '#ff6b6b').text(msg);
-  });
-
-  socket.on('auth-success', (data) => {
-    $('#auth-msg').css('color', '#81b64c').text(data.message);
-  });
+  socket.on('auth-error', (msg) => $('#auth-msg').css('color', '#ff6b6b').text(msg));
+  socket.on('auth-success', (data) => $('#auth-msg').css('color', '#81b64c').text(data.message));
 
   socket.on('login-success', (data) => {
+    loggedInUser = data.username;
     $('#auth-panel').hide();
-    $('#status').text(`Logged in as ${data.username}. Ready to play!`);
+    $('#status').text(`Logged in as ${loggedInUser}. Ready to play!`);
   });
 
+  // Online Players & Direct Challenge List
   socket.on('online-users-update', (users) => {
     const $list = $('#friends-list');
     $list.empty();
-    if (users.length === 0) {
+    const otherUsers = users.filter(u => u !== loggedInUser);
+    if (otherUsers.length === 0) {
       $list.append('<div style="font-size: 13px; color: #777;">No other players online.</div>');
       return;
     }
-    users.forEach(user => {
+    otherUsers.forEach(user => {
       $list.append(`
         <div class="friend-item">
           <span><span class="status-dot"></span>${user}</span>
-          <span style="font-size: 12px; color: #81b64c;">Online</span>
+          <button class="challenge-btn" data-user="${user}" style="padding: 4px 8px; font-size: 12px;">Challenge</button>
         </div>
       `);
     });
+  });
+
+  // Send Challenge
+  $(document).on('click', '.challenge-btn', function() {
+    const target = $(this).data('user');
+    socket.emit('send-challenge', { targetUsername: target });
+    $('#status').text(`Challenge sent to ${target}. Waiting...`);
+  });
+
+  // Receive Challenge
+  socket.on('receive-challenge', (data) => {
+    if (confirm(`${data.challenger} challenged you to a chess game! Accept?`)) {
+      roomCode = data.roomCode;
+      playerColor = 'b';
+      board.orientation('black');
+      socket.emit('accept-challenge', { roomCode: data.roomCode, challenger: data.challenger });
+      $('#chat-panel').show();
+      $('#status').text(`Playing against ${data.challenger} (Black).`);
+    }
+  });
+
+  socket.on('challenge-accepted', (data) => {
+    roomCode = data.roomCode;
+    playerColor = 'w';
+    board.orientation('white');
+    $('#chat-panel').show();
+    $('#status').text(`Opponent accepted! Game started (White).`);
   });
 
   // Room Controls
@@ -277,26 +309,45 @@
   socket.on('room-created', (code) => {
     roomCode = code;
     playerColor = 'w';
+    $('#chat-panel').show();
     $('#status').text(`Room Created: ${code}. Waiting for opponent...`);
   });
 
   socket.on('player-joined', (data) => {
     roomCode = data.roomCode;
-    if (!playerColor || playerColor === 'w') playerColor = 'w';
-    $('#status').text(`Game started! Playing as White.`);
+    $('#chat-panel').show();
+    $('#status').text(`Game started!`);
   });
 
   socket.on('joined-room', (code) => {
     roomCode = code;
     playerColor = 'b';
     board.orientation('black');
-    $('#status').text(`Joined Room ${code}. Playing as Black.`);
+    $('#chat-panel').show();
+    $('#status').text(`Joined Room ${code} (Black).`);
   });
 
   socket.on('move-made', (move) => {
     game.move(move);
     board.position(game.fen());
     updateStatus();
+  });
+
+  // Chat Messaging Logic
+  $('#send-chat-btn').on('click', sendChatMessage);
+  $('#chat-input').on('keypress', (e) => { if (e.which === 13) sendChatMessage(); });
+
+  function sendChatMessage() {
+    const msg = $('#chat-input').val().trim();
+    if (msg && roomCode) {
+      socket.emit('send-chat', { roomCode, message: msg });
+      $('#chat-input').val('');
+    }
+  }
+
+  socket.on('receive-chat', (data) => {
+    $('#chat-messages').append(`<div><b>${data.sender}:</b> ${data.message}</div>`);
+    $('#chat-messages').scrollTop($('#chat-messages')[0].scrollHeight);
   });
 
   socket.on('error-message', (msg) => alert(msg));

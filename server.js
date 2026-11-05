@@ -49,7 +49,7 @@ io.on('connection', (socket) => {
     io.emit('online-users-update', Array.from(onlineUsers.keys()));
   });
 
-  // Rooms & Moves
+  // Handle Room Creation
   socket.on('create-room', () => {
     const roomCode = Math.random().toString(36).substring(2, 7);
     rooms[roomCode] = { players: [socket.id] };
@@ -57,6 +57,7 @@ io.on('connection', (socket) => {
     socket.emit('room-created', roomCode);
   });
 
+  // Handle Room Joining
   socket.on('join-room', (roomCode) => {
     const room = rooms[roomCode];
     if (room && room.players.length === 1) {
@@ -69,10 +70,51 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Handle Direct Challenges between Online Players
+  socket.on('send-challenge', ({ targetUsername }) => {
+    const targetSocketId = onlineUsers.get(targetUsername);
+    if (targetSocketId) {
+      const roomCode = Math.random().toString(36).substring(2, 7);
+      rooms[roomCode] = { players: [socket.id] }; // Challenger is first player
+      
+      io.to(targetSocketId).emit('receive-challenge', {
+        challenger: currentUser,
+        roomCode: roomCode
+      });
+    } else {
+      socket.emit('error-message', 'User is offline.');
+    }
+  });
+
+  // Handle Challenge Acceptance
+  socket.on('accept-challenge', ({ roomCode, challenger }) => {
+    const room = rooms[roomCode];
+    if (room && room.players.length === 1) {
+      room.players.push(socket.id);
+      socket.join(roomCode);
+
+      const challengerSocketId = onlineUsers.get(challenger);
+      if (challengerSocketId) {
+        io.to(challengerSocketId).emit('challenge-accepted', { roomCode });
+      }
+      socket.emit('joined-room', roomCode);
+      io.to(roomCode).emit('player-joined', { roomCode });
+    } else {
+      socket.emit('error-message', 'Challenge expired or invalid.');
+    }
+  });
+
+  // Handle Chess Moves
   socket.on('make-move', (data) => {
     socket.to(data.roomCode).emit('move-made', data.move);
   });
 
+  // Handle Private In-Game Chat
+  socket.on('send-chat', ({ roomCode, message }) => {
+    io.to(roomCode).emit('receive-chat', { sender: currentUser, message });
+  });
+
+  // Handle Disconnect
   socket.on('disconnect', () => {
     if (currentUser) {
       onlineUsers.delete(currentUser);
